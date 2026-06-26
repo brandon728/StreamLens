@@ -15,6 +15,7 @@ before writing, so re-running the pipeline never creates duplicates.
 
 import logging
 from datetime import date
+from pathlib import Path
 
 import duckdb
 
@@ -277,3 +278,34 @@ def buildAllGoldMetrics(
         "content_velocity":   buildContentVelocity(conn, targetDate),
         "catalog_engagement": buildCatalogEngagement(conn, targetDate),
     }
+
+
+def exportGoldParquets(
+    conn: duckdb.DuckDBPyConnection,
+    dataDir: Path,
+) -> None:
+    """
+    Export all Gold tables to parquet files in data/gold/.
+
+    These small files are committed to the repo so the Streamlit Community
+    Cloud dashboard can read them without needing a local DuckDB file.
+    All historical dates are included so the dashboard date picker works.
+    """
+    goldDir = dataDir / "gold"
+    goldDir.mkdir(parents=True, exist_ok=True)
+
+    tables = {
+        "trending_tracker":   "gold_trending_tracker",
+        "genre_performance":  "gold_genre_performance",
+        "network_scorecard":  "gold_network_scorecard",
+        "content_velocity":   "gold_content_velocity",
+        "catalog_engagement": "gold_catalog_engagement",
+    }
+
+    for filename, tableName in tables.items():
+        df = conn.execute(
+            f"SELECT * FROM {tableName} ORDER BY snapshotDate DESC"
+        ).df()
+        outputPath = goldDir / f"{filename}.parquet"
+        df.to_parquet(outputPath, index=False)
+        logger.info("Exported %s → %s (%d rows)", tableName, outputPath.name, len(df))

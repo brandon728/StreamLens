@@ -31,7 +31,7 @@ from streamlens.transform.bronze import (
     writeImdbRatings,
 )
 from streamlens.transform.silver import buildSilverTitles
-from streamlens.transform.gold import buildAllGoldMetrics
+from streamlens.transform.gold import buildAllGoldMetrics, exportGoldParquets
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,6 +89,10 @@ def main() -> None:
     goldCounts = buildAllGoldMetrics(conn, snapshotDate)
     for metricName, rowCount in goldCounts.items():
         logger.info("  → gold_%s: %d rows", metricName, rowCount)
+
+    # ------------------------------------------------------------------ 8. Parquet export
+    logger.info("Step 8/8 — Exporting Gold tables to parquet")
+    exportGoldParquets(conn, DATA_DIR)
 
     conn.close()
 

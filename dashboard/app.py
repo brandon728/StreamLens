@@ -1,19 +1,18 @@
 """
 StreamLens Dashboard — visualizes the five Gold layer metrics.
 
-Run with:  streamlit run dashboard/app.py
+Reads from parquet files in data/gold/ so it works both locally
+and on Streamlit Community Cloud without needing a DuckDB file.
 
-Each tab answers a specific product question a streaming team cares about.
-The dashboard reads directly from the DuckDB file — no server required.
+Run locally with:  streamlit run dashboard/app.py
 """
 
 from pathlib import Path
-import duckdb
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-DB_PATH = Path(__file__).resolve().parents[1] / "data" / "streamlens.duckdb"
+GOLD_DIR = Path(__file__).resolve().parents[1] / "data" / "gold"
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -30,35 +29,36 @@ st.caption(
 )
 
 
-# ── DB connection (cached so it's not re-opened on every interaction) ────────
-@st.cache_resource
-def getDb() -> duckdb.DuckDBPyConnection:
-    if not DB_PATH.exists():
-        st.error(
-            f"Database not found at `{DB_PATH}`. "
-            "Run `python -m streamlens.pipeline` first to populate it."
-        )
-        st.stop()
-    return duckdb.connect(str(DB_PATH), read_only=True)
-
-
+# ── Data loading (cached for 1 hour) ─────────────────────────────────────────
 @st.cache_data(ttl=3600)
-def query(sql: str, params: list = []) -> pd.DataFrame:
-    conn = getDb()
-    return conn.execute(sql, params).df()
+def loadParquet(name: str) -> pd.DataFrame:
+    path = GOLD_DIR / f"{name}.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(path)
 
+
+def filterDate(df: pd.DataFrame, selectedDate) -> pd.DataFrame:
+    if df.empty:
+        return df
+    return df[df["snapshotDate"] == str(selectedDate)].copy()
+
+
+# ── Check data exists ─────────────────────────────────────────────────────────
+trendingAll = loadParquet("trending_tracker")
+if trendingAll.empty:
+    st.warning(
+        "No data found in `data/gold/`. "
+        "Run `uv run python -m streamlens.pipeline` to populate it."
+    )
+    st.stop()
 
 # ── Sidebar: date picker ──────────────────────────────────────────────────────
-availableDates = query(
-    "SELECT DISTINCT snapshotDate FROM silver_titles ORDER BY snapshotDate DESC"
-)
-if availableDates.empty:
-    st.warning("No data yet. Run the pipeline first: `python -m streamlens.pipeline`")
-    st.stop()
+availableDates = sorted(trendingAll["snapshotDate"].unique(), reverse=True)
 
 selectedDate = st.sidebar.selectbox(
     "Snapshot date",
-    options=availableDates["snapshotDate"].tolist(),
+    options=availableDates,
     format_func=lambda d: str(d),
 )
 
@@ -88,13 +88,7 @@ with tab1:
         "Popularity is TMDB's composite score based on page views, ratings, and watchlist adds."
     )
 
-    trendingDf = query("""
-        SELECT title, mediaType, popularity, popularityChange, trendDirection
-        FROM gold_trending_tracker
-        WHERE snapshotDate = ?
-        ORDER BY popularity DESC
-        LIMIT 50
-    """, [selectedDate])
+    trendingDf = filterDate(trendingAll, selectedDate).sort_values("popularity", ascending=False).head(50)
 
     if trendingDf.empty:
         st.info("No trending data for this date.")
@@ -122,7 +116,7 @@ with tab1:
                 trendingDf[["direction", "title", "mediaType", "popularity", "popularityChange"]]
                 .rename(columns={
                     "direction": "", "title": "Title", "mediaType": "Type",
-                    "popularity": "Score", "popularityChange": "Δ vs Yesterday"
+                    "popularity": "Score", "popularityChange": "Δ vs Yesterday",
                 })
                 .head(20),
                 hide_index=True,
@@ -138,12 +132,9 @@ with tab2:
         "Ratings are vote-weighted — genres with more community reviews carry more influence."
     )
 
-    genreDf = query("""
-        SELECT genre, titleCount, weightedImdbRating, avgPopularity
-        FROM gold_genre_performance
-        WHERE snapshotDate = ?
-        ORDER BY weightedImdbRating DESC NULLS LAST
-    """, [selectedDate])
+    genreDf = filterDate(loadParquet("genre_performance"), selectedDate).sort_values(
+        "weightedImdbRating", ascending=False, na_position="last"
+    )
 
     if genreDf.empty:
         st.info("No genre data for this date.")
@@ -182,16 +173,12 @@ with tab3:
     st.subheader("Network Content Scorecard")
     st.markdown(
         "Which streaming networks and broadcasters produce the best-rated and most popular content? "
-        "Only TV titles are included (movies don't have networks). Minimum 3 titles per network."
+        "Only TV titles are included. Minimum 3 titles per network."
     )
 
-    networkDf = query("""
-        SELECT network, titleCount, avgImdbRating, avgPopularity
-        FROM gold_network_scorecard
-        WHERE snapshotDate = ?
-        ORDER BY avgImdbRating DESC NULLS LAST
-        LIMIT 25
-    """, [selectedDate])
+    networkDf = filterDate(loadParquet("network_scorecard"), selectedDate).sort_values(
+        "avgImdbRating", ascending=False, na_position="last"
+    ).head(25)
 
     if networkDf.empty:
         st.info("No network data for this date.")
@@ -214,7 +201,7 @@ with tab3:
         st.dataframe(
             networkDf.rename(columns={
                 "network": "Network", "titleCount": "# Titles",
-                "avgImdbRating": "Avg IMDb Rating", "avgPopularity": "Avg Popularity"
+                "avgImdbRating": "Avg IMDb Rating", "avgPopularity": "Avg Popularity",
             }),
             hide_index=True,
             use_container_width=True,
@@ -229,13 +216,9 @@ with tab4:
         "Velocity is normalized 0–100 based on day-over-day popularity change."
     )
 
-    velocityDf = query("""
-        SELECT title, mediaType, velocityScore, velocityLabel
-        FROM gold_content_velocity
-        WHERE snapshotDate = ?
-        ORDER BY velocityScore DESC
-        LIMIT 50
-    """, [selectedDate])
+    velocityDf = filterDate(loadParquet("content_velocity"), selectedDate).sort_values(
+        "velocityScore", ascending=False
+    ).head(50)
 
     if velocityDf.empty:
         st.info("No velocity data for this date.")
@@ -250,7 +233,7 @@ with tab4:
                 color="velocityLabel",
                 orientation="h",
                 color_discrete_map={"breakout": "#f59e0b", "climbing": "#22c55e"},
-                title="🚀 Breakouts & Climbers",
+                title="Breakouts & Climbers",
                 labels={"velocityScore": "Velocity Score", "title": ""},
             )
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
@@ -264,7 +247,7 @@ with tab4:
                 y="title",
                 orientation="h",
                 color_discrete_sequence=["#ef4444"],
-                title="📉 Fading Titles",
+                title="Fading Titles",
                 labels={"velocityScore": "Velocity Score", "title": ""},
             )
             fig2.update_layout(yaxis={"categoryorder": "total ascending"})
@@ -283,12 +266,7 @@ with tab5:
         "Each bar represents titles from that release decade currently in the trending set."
     )
 
-    catalogDf = query("""
-        SELECT releaseDecade, mediaType, titleCount, avgPopularity, avgImdbRating
-        FROM gold_catalog_engagement
-        WHERE snapshotDate = ?
-        ORDER BY releaseDecade
-    """, [selectedDate])
+    catalogDf = filterDate(loadParquet("catalog_engagement"), selectedDate).sort_values("releaseDecade")
 
     if catalogDf.empty:
         st.info("No catalog data for this date.")
