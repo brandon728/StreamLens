@@ -12,9 +12,13 @@ StreamLens answers the questions a streaming product team asks every morning:
 
 The pipeline ingests data from [TMDB](https://www.themoviedb.org/) and [IMDb](https://developer.imdb.com/non-commercial-datasets/), transforms it through a three-layer architecture, and surfaces the results in a live dashboard. It runs automatically every day via GitHub Actions.
 
+**[View the live dashboard →](https://streamlensbrandon.streamlit.app/)**
+
 ---
 
 ## Dashboard
+
+**[streamlensbrandon.streamlit.app](https://streamlensbrandon.streamlit.app/)** — updates automatically every morning with fresh data.
 
 | | |
 |---|---|
@@ -59,13 +63,14 @@ The pipeline ingests data from [TMDB](https://www.themoviedb.org/) and [IMDb](ht
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
-                    ┌─────────────────┐
-                    │   Dashboard     │
-                    │   (Streamlit)   │
-                    └─────────────────┘
+                    ┌─────────────────────────────┐
+                    │   Live Dashboard            │
+                    │   streamlensbrandon         │
+                    │   .streamlit.app            │
+                    └─────────────────────────────┘
 ```
 
-All data lives in a single [DuckDB](https://duckdb.org/) file — a fast, serverless analytical database that requires no installation or configuration beyond the Python package.
+All data lives in a single [DuckDB](https://duckdb.org/) file — a fast, serverless analytical database that requires no installation or configuration beyond the Python package. The Gold layer is exported to parquet daily and served via [Streamlit Community Cloud](https://streamlensbrandon.streamlit.app/).
 
 ---
 
@@ -80,8 +85,8 @@ All data lives in a single [DuckDB](https://duckdb.org/) file — a fast, server
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/streamlens.git
-cd streamlens
+git clone https://github.com/brandon728/StreamLens.git
+cd StreamLens
 uv sync
 ```
 
@@ -102,17 +107,17 @@ uv run python -m streamlens.pipeline
 This will:
 - Fetch today's trending titles from TMDB (~100 titles)
 - Download today's IMDb dataset snapshot (~100MB, cached after first run)
-- Write all data to `data/streamlens.duckdb`
+- Write all data to `data/streamlens.duckdb` and export Gold tables to `data/gold/`
 
 First run takes 3–5 minutes (IMDb download). Subsequent runs are ~30 seconds.
 
-### 5. Launch the dashboard
+### 5. Launch the dashboard locally
 
 ```bash
 uv run streamlit run dashboard/app.py
 ```
 
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+Open [http://localhost:8501](http://localhost:8501) in your browser. Or visit the hosted version at [streamlensbrandon.streamlit.app](https://streamlensbrandon.streamlit.app/).
 
 ### 6. Run the tests
 
@@ -125,7 +130,7 @@ uv run pytest tests/ -v
 ## Project structure
 
 ```
-streamlens/
+StreamLens/
 ├── src/streamlens/
 │   ├── database.py          # Database setup and schema definitions
 │   ├── pipeline.py          # End-to-end pipeline orchestrator
@@ -135,16 +140,16 @@ streamlens/
 │   └── transform/
 │       ├── bronze.py        # Raw ingestion layer
 │       ├── silver.py        # Cleaning and joining layer
-│       └── gold.py          # Business metrics layer
+│       └── gold.py          # Business metrics layer + parquet export
 ├── dashboard/
 │   └── app.py               # Streamlit dashboard
+├── data/gold/               # Parquet exports for the hosted dashboard
 ├── tests/                   # Unit tests
 ├── docs/
 │   └── data_dictionary.md   # Plain-English field definitions
-├── .github/workflows/
-│   └── pipeline.yml         # Daily GitHub Actions run
-└── data/
-    └── streamlens.duckdb    # Local database (gitignored)
+├── requirements.txt         # Streamlit Cloud dependencies
+└── .github/workflows/
+    └── pipeline.yml         # Daily pipeline + parquet commit
 ```
 
 ---
@@ -174,7 +179,9 @@ Full field definitions → [docs/data_dictionary.md](docs/data_dictionary.md)
 
 ## Automated refresh
 
-The pipeline runs automatically every day at 06:00 UTC via GitHub Actions. To enable this on your fork:
+The pipeline runs automatically every day at 06:00 UTC via GitHub Actions. Fresh data is committed back to the repo and the [live dashboard](https://streamlensbrandon.streamlit.app/) redeploys automatically.
+
+To run this on your own fork:
 
 1. Go to **Settings → Secrets and variables → Actions**
 2. Add a secret named `TMDB_API_KEY` with your API key value
