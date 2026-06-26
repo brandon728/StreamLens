@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv
+
+# Environment variables (contains API keys — never commit this)
+.env
+
+# StreamLens database and downloaded data
+data/*.duckdb
+data/imdb/
+
+# Test and build cache
+.pytest_cache/
+
+# Claude Code tool configuration (editor-specific)
+.claude/

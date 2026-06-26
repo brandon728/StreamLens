@@ -1,0 +1,43 @@
+name: StreamLens Daily Pipeline
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC — data is fresh before US business hours
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    # Also allows manual trigger from the GitHub Actions UI (great for demos)
+
+jobs:
+  run-pipeline:
+    name: Ingest → Transform → Gold
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pipeline
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: uv run python -m streamlens.pipeline
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+      - name: Upload DuckDB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: streamlens-db-${{ github.run_id }}
+          path: data/streamlens.duckdb
+          retention-days: 7
