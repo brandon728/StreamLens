@@ -14,6 +14,19 @@ The pipeline ingests data from [TMDB](https://www.themoviedb.org/) and [IMDb](ht
 
 ---
 
+## Dashboard
+
+| | |
+|---|---|
+| ![Trending Tracker](assets/screenshots/screenshot_trending.png) | ![Genre Performance](assets/screenshots/screenshot_genre.png) |
+| **Trending Tracker** — top titles by popularity with rise/fall indicators | **Genre Performance** — vote-weighted IMDb ratings by genre |
+| ![Network Scorecard](assets/screenshots/screenshot_network.png) | ![Content Velocity](assets/screenshots/screenshot_velocity.png) |
+| **Network Scorecard** — best-rated streaming networks | **Content Velocity** — breakout and fading titles |
+| ![Catalog vs New](assets/screenshots/screenshot_catalog.png) | |
+| **Catalog vs. New** — popularity and ratings by release decade | |
+
+---
+
 ## How it works
 
 ```
