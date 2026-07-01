@@ -5,7 +5,7 @@ Seeds silver_titles directly (bypassing bronze/silver) to test each
 gold metric in isolation. Uses in-memory DuckDB for speed.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import duckdb
 import pandas as pd
@@ -38,7 +38,7 @@ def _seedSilver(conn: duckdb.DuckDBPyConnection, rows: list[dict]) -> None:
 
 
 TODAY = date.today()
-YESTERDAY = date(TODAY.year, TODAY.month, TODAY.day - 1) if TODAY.day > 1 else date(TODAY.year, TODAY.month - 1, 28)
+YESTERDAY = TODAY - timedelta(days=1)
 
 BASE_ROW = {
     "snapshotDate": TODAY,
