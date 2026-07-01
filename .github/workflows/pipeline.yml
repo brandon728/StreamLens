@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,4 +46,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/gold/
           git diff --staged --quiet || git commit -m "chore: refresh gold data $(date +%Y-%m-%d)"
-          git push
+          git push origin HEAD:main
