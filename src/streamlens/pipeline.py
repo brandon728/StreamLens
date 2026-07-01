@@ -74,6 +74,16 @@ def _loadSilverHistory(conn, snapshotDate: date) -> None:
         logger.info("  → Silver history parquet exists but has no prior dates")
         return
 
+    # Skip dates already present in DuckDB (e.g. from a prior local run)
+    existingDates = {
+        r[0] for r in conn.execute("SELECT DISTINCT snapshotDate FROM silver_titles").fetchall()
+    }
+    historicalDf = historicalDf[~historicalDf["snapshotDate"].isin(existingDates)]
+
+    if historicalDf.empty:
+        logger.info("  → All historical dates already in DuckDB — nothing to load")
+        return
+
     conn.execute("INSERT INTO silver_titles BY NAME SELECT * FROM historicalDf")
     uniqueDates = historicalDf["snapshotDate"].nunique()
     logger.info(
