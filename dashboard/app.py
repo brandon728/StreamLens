@@ -56,9 +56,13 @@ if trendingAll.empty:
 # ── Last refresh status ───────────────────────────────────────────────────────
 latestDate = pd.to_datetime(trendingAll["snapshotDate"].max()).date()
 totalDates = trendingAll["snapshotDate"].nunique()
-col_title, col_status = st.columns([4, 1])
+col_title, col_status, col_btn = st.columns([4, 1, 1])
 with col_status:
     st.success(f"Last refresh: **{latestDate}**  \n{totalDates} days of data")
+with col_btn:
+    if st.button("Clear cache", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # ── Sidebar: date picker ──────────────────────────────────────────────────────
 availableDates = sorted(trendingAll["snapshotDate"].unique(), reverse=True)
