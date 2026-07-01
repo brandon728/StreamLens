@@ -53,6 +53,13 @@ if trendingAll.empty:
     )
     st.stop()
 
+# ── Last refresh status ───────────────────────────────────────────────────────
+latestDate = pd.to_datetime(trendingAll["snapshotDate"].max()).date()
+totalDates = trendingAll["snapshotDate"].nunique()
+col_title, col_status = st.columns([4, 1])
+with col_status:
+    st.success(f"Last refresh: **{latestDate}**  \n{totalDates} days of data")
+
 # ── Sidebar: date picker ──────────────────────────────────────────────────────
 availableDates = sorted(trendingAll["snapshotDate"].unique(), reverse=True)
 
@@ -122,6 +129,65 @@ with tab1:
                 hide_index=True,
                 use_container_width=True,
             )
+
+    # ── 7-day trend line chart ────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("7-Day Popularity Trend")
+    st.markdown(
+        "How has each title's popularity shifted over the past week? "
+        "Tracks the top 20 titles by their most recent popularity score."
+    )
+
+    # Top 20 titles on the most recent date
+    recentDate = trendingAll["snapshotDate"].max()
+    top20Titles = (
+        trendingAll[trendingAll["snapshotDate"] == recentDate]
+        .sort_values("popularity", ascending=False)
+        .head(20)["title"]
+        .tolist()
+    )
+
+    # All dates available, capped at 7
+    last7Dates = sorted(trendingAll["snapshotDate"].unique())[-7:]
+
+    trendLineDf = (
+        trendingAll[
+            trendingAll["title"].isin(top20Titles) &
+            trendingAll["snapshotDate"].isin(last7Dates)
+        ]
+        .copy()
+    )
+    trendLineDf["snapshotDate"] = pd.to_datetime(trendLineDf["snapshotDate"])
+
+    if len(last7Dates) < 2:
+        st.info("Trend chart requires at least 2 days of data. Check back tomorrow.")
+    else:
+        figLine = px.line(
+            trendLineDf.sort_values("snapshotDate"),
+            x="snapshotDate",
+            y="popularity",
+            color="title",
+            markers=True,
+            labels={
+                "snapshotDate": "Date",
+                "popularity": "Popularity Score",
+                "title": "Title",
+            },
+            title=f"Top 20 Titles — Popularity Over Last {len(last7Dates)} Days",
+        )
+        figLine.update_layout(
+            height=500,
+            xaxis=dict(tickformat="%b %d"),
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02,
+                font=dict(size=11),
+            ),
+        )
+        st.plotly_chart(figLine, use_container_width=True)
 
 
 # ── Tab 2: Genre Performance ──────────────────────────────────────────────────
