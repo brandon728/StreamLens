@@ -144,10 +144,10 @@ with tab1:
 
     # Top 20 titles on the most recent date
     recentDate = trendingAll["snapshotDate"].max()
-    top20Titles = (
+    top5Titles = (
         trendingAll[trendingAll["snapshotDate"] == recentDate]
         .sort_values("popularity", ascending=False)
-        .head(20)["title"]
+        .head(5)["title"]
         .tolist()
     )
 
@@ -156,7 +156,7 @@ with tab1:
 
     trendLineDf = (
         trendingAll[
-            trendingAll["title"].isin(top20Titles) &
+            trendingAll["title"].isin(top5Titles) &
             trendingAll["snapshotDate"].isin(last7Dates)
         ]
         .copy()
@@ -177,7 +177,7 @@ with tab1:
                 "popularity": "Popularity Score",
                 "title": "Title",
             },
-            title=f"Top 20 Titles — Popularity Over Last {len(last7Dates)} Days",
+            title=f"Top 5 Titles — Popularity Over Last {len(last7Dates)} Days",
         )
         figLine.update_layout(
             height=500,
