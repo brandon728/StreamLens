@@ -129,8 +129,7 @@ def buildSilverTitles(
         merged["releaseDate"]
         .astype(str)
         .str[:4]
-        .where(merged["releaseDate"].notna())
-        .apply(lambda y: int(y) if y and y.isdigit() else None)
+        .apply(lambda y: int(y) if isinstance(y, str) and y.isdigit() else None)
     )
 
     # Build the final silver DataFrame with only the columns we need

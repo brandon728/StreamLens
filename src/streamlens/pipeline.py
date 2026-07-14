@@ -94,9 +94,21 @@ def _loadSilverHistory(conn, snapshotDate: date) -> None:
 
 
 def _exportSilverParquet(conn, dataDir: Path) -> None:
-    """Export all silver_titles rows to parquet so the next pipeline run has history."""
-    df = conn.execute("SELECT * FROM silver_titles ORDER BY snapshotDate DESC").df()
+    """Export silver_titles to parquet, merging with any existing file so dates
+    not present in this DuckDB (e.g. from prior GitHub Actions runs) are kept."""
+    newDf = conn.execute("SELECT * FROM silver_titles ORDER BY snapshotDate DESC").df()
     outputPath = dataDir / "silver_titles.parquet"
+
+    if outputPath.exists():
+        existingDf = pd.read_parquet(outputPath)
+        newDates = set(newDf["snapshotDate"].astype(str).unique())
+        existingDf = existingDf[~existingDf["snapshotDate"].astype(str).isin(newDates)]
+        df = pd.concat([newDf, existingDf], ignore_index=True).sort_values(
+            "snapshotDate", ascending=False
+        )
+    else:
+        df = newDf
+
     df.to_parquet(outputPath, index=False)
     logger.info("  → Saved %d silver rows to %s", len(df), outputPath.name)
 

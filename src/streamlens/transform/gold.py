@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -303,9 +304,23 @@ def exportGoldParquets(
     }
 
     for filename, tableName in tables.items():
-        df = conn.execute(
+        newDf = conn.execute(
             f"SELECT * FROM {tableName} ORDER BY snapshotDate DESC"
         ).df()
         outputPath = goldDir / f"{filename}.parquet"
+
+        # Merge with any existing parquet so dates not in this DuckDB are preserved.
+        # This matters for local runs where the DuckDB may be missing dates that
+        # GitHub Actions already committed.
+        if outputPath.exists():
+            existingDf = pd.read_parquet(outputPath)
+            newDates = set(newDf["snapshotDate"].astype(str).unique())
+            existingDf = existingDf[~existingDf["snapshotDate"].astype(str).isin(newDates)]
+            df = pd.concat([newDf, existingDf], ignore_index=True).sort_values(
+                "snapshotDate", ascending=False
+            )
+        else:
+            df = newDf
+
         df.to_parquet(outputPath, index=False)
         logger.info("Exported %s → %s (%d rows)", tableName, outputPath.name, len(df))
